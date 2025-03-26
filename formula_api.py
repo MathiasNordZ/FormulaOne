@@ -1,6 +1,6 @@
 import httpx
 from fastapi import FastAPI
-from models.models import Driver, RacePosition
+from models.models import Driver, RacePosition, SessionInfo
 
 app = FastAPI()
 
@@ -48,3 +48,26 @@ async def get_positions():
     )
     for pos_data in data
   ]
+
+"""
+Method that creates a route '/session'
+Returns and array of SessionInfo objects.
+"""
+@app.get("/session")
+async def get_session():
+  async with httpx.AsyncClient() as client:
+    session_url = f"{base_url}sessions?session_key=latest"
+    response = await client.get(session_url)
+    data = response.json()
+
+    return [
+      SessionInfo (
+          circuit_name=session_data["circuit_short_name"],
+          country = session_data["country_name"],
+          session_name = session_data["session_name"],
+          session_type = session_data["session_type"],
+          date_end = session_data["date_end"],
+          date_start = session_data["date_start"]
+      )
+      for session_data in data
+    ]
