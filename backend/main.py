@@ -1,67 +1,73 @@
-from urllib.request import urlopen
-import matplotlib.pyplot as plt
-import json
+import httpx
+from fastapi import FastAPI
+from backend.models.models import Driver, RacePosition, SessionInfo
+
+app = FastAPI()
+
+base_url = "https://api.openf1.org/v1/"
 
 """
-The RequestHandler class handles the request, that will respond with a JSON.
+Method that creates a route '/drivers'.
+Returns an array of driver objects.
 """
-class RequestHandler:
-    def __init__(self, url):
-        self.url = url
+@app.get("/drivers")
+async def get_drivers():
+  # Will get all drivers from API.
+  async with httpx.AsyncClient() as client:
+    driver_url = f"{base_url}drivers?session_key=latest"
+    response = await client.get(driver_url)
+    data = response.json()
 
-    def load_data(self):
-        if len(self.url) == 0 or self.url is None:
-            raise ValueError
-
-        response = urlopen(self.url)
-        data = json.loads(response.read().decode("utf-8"))
-        pretty_data = json.dumps(data, indent=2)
-        response.close()
-
-        return data
-
-    def filter_by_driver(self, data, driver_number):
-        return [
-            {"driver_number": item["driver_number"], "position": item["position"], "time": item["date"], "session key": item["session_key"]}
-            for item in data if item["driver_number"] == driver_number
-        ]
+  return [
+    Driver(
+        driver_name = driver["full_name"],
+        team_name = driver["team_name"],
+        driver_number = driver["driver_number"],
+        name_acronym= driver["name_acronym"]
+    )
+    for driver in data
+  ]
 
 """
-The DriverPosition class tracks the position of the drivers.
+Method that creates a route '/positions'
+Returns an array of position objects.
 """
-class DriverPosition:
-    def __init__(self):
-        self.request_handler = RequestHandler("https://api.openf1.org/v1/position?session_key=latest")
+@app.get("/positions")
+async def get_positions():
+  # Will get all positions from API.
+  async with httpx.AsyncClient() as client:
+    position_url = f"{base_url}position?session_key=latest"
+    response = await client.get(position_url)
+    data = response.json()
 
-    # Method to get the request handler field.
-    def get_request_handler(self):
-        return self.request_handler
+  return [
+    RacePosition (
+        date = pos_data["date"],
+        driver_number = pos_data["driver_number"],
+        position = pos_data["position"]
+    )
+    for pos_data in data
+  ]
 
-    # Method to get the position of a driver.
-    def get_driver_position(self, driver_number):
-        data = self.request_handler.load_data()
-        filtered_data = self.request_handler.filter_by_driver(data, driver_number)
+"""
+Method that creates a route '/session'
+Returns and array of SessionInfo objects.
+"""
+@app.get("/session")
+async def get_session():
+  async with httpx.AsyncClient() as client:
+    session_url = f"{base_url}sessions?session_key=latest"
+    response = await client.get(session_url)
+    data = response.json()
 
-        return filtered_data
-
-    def list_data(self, filtered_data):
-        position_list = []
-        timestamp_list = []
-        for item in filtered_data:
-            position_list.append(item["position"])
-            timestamp_list.append(item["time"])
-
-        return position_list, timestamp_list
-
-
-position = DriverPosition()
-driver_position = position.list_data(position.get_driver_position(44))
-
-
-y = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-
-plt.plot(driver_position[1], driver_position[0])
-plt.gca().invert_yaxis()
-plt.yticks(y)
-plt.grid(axis="y")
-plt.show()
+    return [
+      SessionInfo (
+          circuit_name=session_data["circuit_short_name"],
+          country = session_data["country_name"],
+          session_name = session_data["session_name"],
+          session_type = session_data["session_type"],
+          date_end = session_data["date_end"],
+          date_start = session_data["date_start"]
+      )
+      for session_data in data
+    ]
